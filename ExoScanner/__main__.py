@@ -7,7 +7,7 @@ from ExoScanner.run import run
 import sys
 
 def main():
-    run(sys.argv[1])
+    run('../testdata') # TODO Change back to sys.argv[0]
 
 
 if __name__ == "__main__":
