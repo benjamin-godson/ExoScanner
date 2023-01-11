@@ -15,18 +15,7 @@ def convertToTriangleSpace(sides):
 
 
 def selectBrightest(catalog, N):
-    brightestElements = PriorityQueue()
-    for i in range(len(catalog)):
-        smallest = -1
-        if (not brightestElements.empty()): smallest = brightestElements.get()
-        if (brightestElements.qsize() < N - 1 or smallest < (catalog[i]["flux"], i)):
-            brightestElements.put((catalog[i]["flux"], i))
-        if (brightestElements.qsize() < N and smallest != -1):
-            brightestElements.put(smallest)
-
-    res = []
-    while not brightestElements.empty():
-        res.append(brightestElements.get()[1])
+    res = np.argpartition(catalog["flux"].data, -20, axis=None)[-20:]
 
     return res
 
@@ -52,10 +41,10 @@ def findTriangles(catalog, N):
     for i in range(0, N):
         for j in range(i + 1, N):
             for k in range(j + 1, N):
-                if (convertToTriangleSpace([distances[i][j], distances[j][k], distances[k][i]])[
-                    1] < 0.1): continue  # ignore long triangles
-                triangles.append(
-                    (*convertToTriangleSpace([distances[i][j], distances[j][k], distances[k][i]]), i, j, k))
+                tris = convertToTriangleSpace([distances[i][j], distances[j][k], distances[k][i]])
+                if tris[1] < 0.1:
+                    continue  # ignore long triangles
+                triangles.append((*tris, i, j, k))
     triangles = np.array(triangles)
     return triangles
 
@@ -74,7 +63,7 @@ def binarySearchTriangles(triangles, r_i, value):
     return l
 
 
-def firstMatchingUsingTriangles(mergedCatalog, newCatalog, N, epsilon=0.02):
+def firstMatchingUsingTriangles(mergedCatalog, newCatalog, N, epsilon=0.04):
     votes = np.zeros((N, N))
     oldTriangles = findTriangles(mergedCatalog, N)
     oldTriangles.sort()
@@ -88,28 +77,13 @@ def firstMatchingUsingTriangles(mergedCatalog, newCatalog, N, epsilon=0.02):
                        binarySearchTriangles(oldTriangles, r_i, triangles[i][0] + epsilon)):
             if (((triangles[i][0] - oldTriangles[j][0]) ** 2) + ((triangles[i][1] - oldTriangles[j][1]) ** 2)) < (
                     epsilon ** 2):
-
-                votes[triangles[i][2:5].astype(int), oldTriangles[j][2:5].astype(int)] += 1
-
-    highestVotes = PriorityQueue()
-
-    for i in range(0, N):
-        for j in range(0, N):
-            smallest = -1
-            if not highestVotes.empty():
-                smallest = highestVotes.get()
-            if highestVotes.qsize() < N - 1 or smallest < (votes[i][j], i, j):
-                highestVotes.put((votes[i][j], i, j))
-            if highestVotes.qsize() < N and smallest != -1:
-                highestVotes.put(smallest)
+                votes[triangles[i].astype(int)[2:5], oldTriangles[j].astype(int)[2:5]] += 1
 
     matching = []
+    indices = np.vstack(np.unravel_index(np.argpartition(votes.flatten(), -N)[-N:], votes.shape)).T
+    for i in range(N):
+        matching.append((selection[indices[i, 0]], oldSelection[indices[i, 1]]))
 
-    while not highestVotes.empty():
-        tmp = highestVotes.get()
-        matching.append((selection[tmp[1]], oldSelection[tmp[2]]))
-
-    matching.reverse()
     return matching
 
 
